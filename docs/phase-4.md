@@ -2,7 +2,8 @@
 
 **Date:** 18 November 2026
 **Result:** Passed. Hermes knows the homelab and Dina's preferences, finds past conversations, and reads and writes
-markdown notes that are committed nightly for review. Nothing gets remembered and no skill changes without approval.
+markdown notes that are committed nightly for review. Skill changes need approval; memory saves apply directly but
+every change is kept in git history (see "Decision: memory approvals off, history in git").
 
 ## What is it
 
@@ -15,7 +16,7 @@ Hermes keeps knowledge in four tiers:
 | 3. External memory | Third-party memory services (Honcho and others) | **Not used**: they would send homelab details off the server |
 | 4. Notes folder | Markdown notes that both Hermes and I read and write | `~/hermes/notes`, mounted at `/opt/data/notes`, its own git repo |
 
-Plus two **approval gates**: memory writes and skill changes are staged until I approve them.
+Plus a **skills approval gate**, and a **memory history** in git instead of a memory approval gate.
 
 ## How does it work
 
@@ -39,7 +40,7 @@ Plus two **approval gates**: memory writes and skill changes are staged until I 
 
 **Approval gates** (`config.yaml`):
 ```yaml
-memory: { write_approval: true }    # /memory pending · /memory approve <id> · /memory reject <id>
+memory: { write_approval: false }   # saves apply directly; history kept in notes/_agent-memory (see below)
 skills: { write_approval: true }    # /skills pending · /skills diff <id> · /skills approve|reject <id>
 security: { allow_lazy_installs: false }   # nothing downloads packages at runtime (npx etc.)
 ```
@@ -65,6 +66,28 @@ I checked the source code. The background **curator** writes skills only through
   `git log -p`.
 - Hermes uses its **built-in file tools**. No filesystem MCP: mounting inside `/opt/data` was simpler, and with a
   terminal tool in the container an MCP's folder scope wouldn't have been a real security boundary anyway.
+
+## Decision: memory approvals off, history in git
+
+I first turned on `memory.write_approval: true`, so every memory save waited for `/memory approve` in Discord. After
+testing I switched it **off** and keep a history instead:
+
+- **Why:** memory saves are small and frequent (one every ~10 turns from the background review). Approving each one
+  in Discord added friction for little safety. A bad memory is easy to see and undo, as long as I can see *what*
+  changed and *when*. Skills stay gated because they are long instructions that change how Hermes works (see the
+  curator incident below).
+- **How:** the nightly job (`scripts/notes-commit.sh`, 23:45) first copies exactly three files, `MEMORY.md` and
+  `USER.md` (from `data/memories/`) and `SOUL.md` (from `data/`), into `notes/_agent-memory/`, then commits. `git log -p
+  _agent-memory/` shows every memory change, day by day.
+- **No secrets:**
+  - Only those three files are copied, by name. Nothing else in `data/` (`.env`, `config.yaml`, `state.db`) can be
+    copied.
+  - `data/` is `700`, so the script reads the files through the container (`docker exec -u hermes hermes cat …`).
+  - A file that matches common key patterns (OpenRouter, Anthropic, GitHub, Discord, Tavily, AWS, private keys) is
+    **skipped** and logged instead of copied, in case the agent ever saves a pasted key.
+  - The notes repo has no remote.
+- **Read-only:** the copies are `444`, and the folder's ACL gives Hermes (UID 10000) read only (`setfacl -b`, then
+  `u:10000:r-x`), so Hermes can't rewrite its own history.
 
 ## What went wrong
 
@@ -105,7 +128,11 @@ I checked the source code. The background **curator** writes skills only through
 | Hermes writes to `notes/.git` | ✅ Denied |
 | Hermes read check on `/opt/data/notes/Runbooks/Pi-hole.md` | ✅ Allowed (the old `/opt/data/vault/…` path was blocked) |
 | "Show my runbook for Pi-hole" (new session) | ✅ `read_file` returned the runbook (log: blocked at 20:43 on the vault path, OK at 20:52 on notes) |
-| Memory write approval | ✅ An agent memory write was staged in `pending/memory/` instead of saved |
+| Memory write approval (while it was on) | ✅ An agent memory write was staged in `pending/memory/`; approved with `/memory approve` |
+| Memory approval off | ✅ `memory.write_approval` reads `false` after the recreate; `/memory pending` empty |
+| Memory history script, run by hand | ✅ Committed `_agent-memory/{MEMORY,USER,SOUL,README}.md` (`c580d10`); a second run printed "no changes" |
+| Secret filter | ✅ Fake OpenRouter, GitHub, Tavily, Discord, AWS and private-key strings all caught; the 3 real files pass clean |
+| Hermes writes to `_agent-memory/` | ✅ Denied (edit and create) |
 | Session search: decision in one session, asked in a new one | ✅ Correct answer |
 | Core files loaded in a new session | ✅ |
 | Nightly commit script | ✅ Test run committed the README change (`a9434c0`) |
