@@ -25,11 +25,11 @@ Behind both channels sits one agent with one memory. It picks the right model fo
           ▼
   Hermes gateway  — Docker on the OptiPlex, non-root, 1.5 GB RAM cap
    ├── Models via OpenRouter
-   │     main: cheap flash model · escalate: Claude Sonnet · sub-agents: GLM Flash
+   │     main: cheap model · escalate: Claude Sonnet · sub-agents: cheap flash model
    ├── Memory: core files + session search + git-backed markdown vault
    ├── Tools: web search (free tiers), read-only MCPs
    │     Prometheus · GitHub (read-only) · vault folder only
-   ├── Sub-agents: up to 3 in parallel, cheap model, restricted toolsets
+   ├── Sub-agents: up to 3 in parallel (set; default 10), cheap model, inherit parent's tools
    └── Cron: daily brief, reminders, weekly reports → Discord / WhatsApp
 ```
 
@@ -50,8 +50,9 @@ Hermes does not use one model for everything. There are five separate places a m
 | Main (default) | DeepSeek V4.1 Flash or Claude Haiku 5.5 (pick after testing) | $0.14 / $0.42 · $0.10 / $0.50 | Everyday Discord chat, homelab questions, reminders, planning |
 | Escalation | Claude Sonnet 5.5 | $2.00 / $10.00 | Hard research synthesis, tricky reasoning, coordinating complex multi-agent runs |
 | Mid-tier (optional) | GPT-6.1 Terra | $1.00 / $5.00 | Cheaper middle step before Sonnet |
-| Sub-agents | GLM 5.3 Flash | $0.04 / $0.078 | Bulk reading, searching, summarising sources in parallel |
-| Auxiliary slots | GLM 5.3 Flash | $0.04 / $0.078 | Context compression, titles, session search, approval scoring |
+| Sub-agents | DeepSeek V4.1 Flash 1017 (for now; benchmark decides) | $0.036 / $0.50 | Bulk reading, searching, summarising sources in parallel |
+| Auxiliary slots (cheap) | DeepSeek V4.1 Flash 1017 (for now) | $0.036 / $0.50 | `compression`, `title_generation`, `curator` |
+| Auxiliary slots (quality) | Claude Haiku 5.5 | $0.10 / $0.50 | `approval` (security), `background_review`, `memory_query_rewrite` (memory quality) |
 
 **Prices:** read from OpenRouter on 16 Nov 2026 (BenchLM). They change often and vary by routed provider, so copy current prices and exact model slugs from openrouter.ai/models before configuring.
 
@@ -59,9 +60,9 @@ Hermes does not use one model for everything. There are five separate places a m
 
 Four mechanisms work together. Set them up in this order:
 
-1. **Auxiliary slots.** Background tasks (compression, titles, search) each have their own model setting. Point them all at the cheap model. This is the biggest single saving.
-2. **Delegation model.** Sub-agents use `delegation.model`. If left unset they inherit the main model, so three parallel sub-agents on Sonnet cost three times Sonnet.
-3. **Smart routing (automatic tiers).** The official `model-picker` plugin (Hermes 0.21.5 or newer) classifies each turn and picks a cheap, work or high tier. It is deliberately conservative: it keeps the previous tier unless the turn clearly changes, and the high tier never sticks across turns.
+1. **Auxiliary slots.** Background tasks each have their own model setting (`auxiliary.<slot>`; real names: `compression`, `title_generation`, `curator`, `approval`, `background_review`, `memory_query_rewrite`, …). Point the low-stakes ones at the cheap model; keep approval and memory slots on Haiku.
+2. **Delegation model.** Sub-agents use `delegation.model`. If left unset they inherit the main model, so three parallel sub-agents on Sonnet cost three times Sonnet. Defaults are `max_iterations: 250` and `max_concurrent_children: 10`, so set both lower.
+3. **Smart routing (automatic tiers).** The official `model-picker` plugin (Hermes 0.21.5 or newer) classifies each turn and picks a `low`, `default` or `high` tier. It is deliberately conservative: it keeps the previous tier unless the turn clearly changes, and the high tier never sticks across turns.
 4. **Manual escalation with aliases.** Define short names (`fast`, `smart`, `deep`) and switch with `/model smart` in Discord when you know a job is hard.
 
 **Tip:** cron jobs should name their model explicitly so scheduled work never runs on the expensive tier by accident.
@@ -204,32 +205,46 @@ Set the models with `hermes model` and `hermes config set`, or edit `config.yaml
 # ~/hermes/data/config.yaml  (excerpt — merge, don't overwrite)
 model:
   provider: openrouter
-  default: deepseek/deepseek-v4.1-flash      # or anthropic/claude-haiku-5.5
-  aliases:
-    fast:  deepseek/deepseek-v4.1-flash
-    smart: anthropic/claude-sonnet-5.5
-    mid:   openai/gpt-6.1-terra
+  default: anthropic/claude-haiku-5.5        # decided by the benchmark
+# Aliases: use the canonical top-level form. The short form model.aliases.<name>: a/b
+# reads "a" as the PROVIDER, so anthropic/… fails with "Anthropic is not connected".
+model_aliases:
+  fast:  { model: deepseek/deepseek-v4.1-flash-1017, provider: openrouter }
+  haiku: { model: anthropic/claude-haiku-5.5,        provider: openrouter }
+  mid:   { model: openai/gpt-6.1-terra,              provider: openrouter }
+  smart: { model: anthropic/claude-sonnet-5.5,       provider: openrouter }
+# reasoning effort: agent.reasoning_effort is ignored in v0.23.2 (see docs/phase-3.md)
  
 delegation:
   provider: openrouter
-  model: z-ai/glm-5.3-flash
-  max_iterations: 30
+  model: deepseek/deepseek-v4.1-flash-1017   # cheap model, decided by the benchmark
+  max_iterations: 30                         # default 250
+  max_concurrent_children: 3                 # default 10
  
-auxiliary:            # set each slot (compression, title, session_search,
-  compression:        # approval, web_extract …) to the cheap model
-    provider: openrouter
-    model: z-ai/glm-5.3-flash
+# Real slot names (v0.23.2): compression, title_generation, curator, approval,
+# background_review, memory_query_rewrite, review, mcp, vision (+ unused voice/kanban/moa…).
+# There is no session_search or web_extract slot. "auto" = follow the main model.
+auxiliary:
+  compression:        { provider: openrouter, model: deepseek/deepseek-v4.1-flash-1017 }
+  title_generation:   { provider: openrouter, model: deepseek/deepseek-v4.1-flash-1017 }
+  curator:            { provider: openrouter, model: deepseek/deepseek-v4.1-flash-1017 }
+  approval:           { provider: openrouter, model: anthropic/claude-haiku-5.5 }  # security decision
+  background_review:  { provider: openrouter, model: anthropic/claude-haiku-5.5 }  # memory quality
+  memory_query_rewrite: { provider: openrouter, model: anthropic/claude-haiku-5.5 }
  
 web:
   search_backend: tavily
   extract_backend: tavily
 ```
 
-**Check:** model slugs and auxiliary slot names change between releases. Copy slugs from openrouter.ai/models and slot names from the Configuring Models doc page for your installed version.
+**Check:** model slugs and auxiliary slot names change between releases. Copy slugs from openrouter.ai/models and slot names from `hermes config get auxiliary --json` on your installed version. Avoid `~…-latest` aliases (they silently change model) and `:batch` variants (offline only).
 
-Then enable automatic tiering:
+**Corrected 18 Nov 2026 (Phase 3 research):** GLM 5.3 Flash removed: the real `z-ai/glm-5.3-flash` is $0.15 / $0.50; the $0.04 / $0.078 price belonged to the `~z-ai/glm-flash-latest` alias. Cheap-slot candidates are now DeepSeek V4.1 Flash 1017 ($0.036 / $0.50) and Qwen 3.7 Flash ($0.03 / $0.13).
 
-- Install the `model-picker` plugin (needs Hermes 0.21.5+). Map tiers: cheap = main model, work = Haiku or Terra, high = Sonnet.
+Then enable automatic tiering (later, after the benchmark; review the plugin's code before enabling):
+
+- Install the `model-picker` plugin (needs Hermes 0.21.5+). Its tiers are **`low` (Quick) / `default` (Standard) / `high` (Expert)**, not cheap/work/high (`medium` is a deprecated alias for `default`). Map: low = main model, default = Haiku or Terra, high = Sonnet. All tiers must use the same provider (OpenRouter).
+- Costs and privacy: by default the classifier runs on the active model, one extra call per turn with up to ~12,000 characters of context; it logs the first 120 characters of each prompt to `logs/model-picker.log`; a model switch drops the prompt cache for that turn.
 - Leave it conservative at first. If it never escalates, that is by design: use `/model smart` manually.
 - Log which model answered each request to `#agent-log` (a skill that posts a one-line summary at the end of each job).
 
@@ -277,7 +292,9 @@ vault/
 
 **Goal:** big jobs are split across parallel workers on a cheap model, then combined by the main agent.
 
-How it works: the main agent calls `delegate_task`. Each sub-agent starts with a **blank context** and only knows what the main agent puts in its goal and context fields, so instructions must be complete. Up to three run in parallel, and only each child's final summary comes back to the main conversation.
+How it works: the main agent calls `delegate_task`. Each sub-agent starts with a **blank context** and only knows what the main agent puts in its goal and context fields, so instructions must be complete. Up to three run in parallel (`delegation.max_concurrent_children: 3`; the default is 10), and only each child's final summary comes back to the main conversation.
+
+**Corrected 18 Nov 2026:** `delegate_task` has **no toolsets parameter**. Children inherit the parent's enabled toolsets (and MCP toolsets, via `delegation.inherit_mcp_toolsets: true`). So per-sub-agent tool restriction can't be done with a skill alone. Options to research in Phase 5: `delegation.inherit_mcp_toolsets: false`, delegation `profiles` (each profile has its own terminal policy/credentials), or keeping risky tools off the parent entirely.
 
 #### Patterns to build, in order
 
@@ -289,8 +306,8 @@ How it works: the main agent calls `delegate_task`. Each sub-agent starts with a
 | Repo review | One reads code, one reads issues and commits, one checks docs | GitHub MCP only |
 
 - Keep `delegation.model` on the cheap model. Only the coordinator escalates.
-- Give each pattern a skill that names the toolsets, so sub-agents never get the full tool list.
-- Cap `max_iterations` (start at 30) so a confused sub-agent cannot loop and burn tokens.
+- Give each pattern a skill that describes which tools to use. A skill is guidance, not enforcement: children still inherit the parent's toolsets (see the correction above).
+- Cap `max_iterations` (set to 30; default 250) so a confused sub-agent cannot loop and burn tokens.
 - No sub-agent gets write access to anything except the vault.
 
 **Test:** run the research fan-out on one topic, single-agent vs three sub-agents. Compare cost, time and the quality of the final note.
@@ -392,7 +409,7 @@ Alternative: Nous Portal Plus at $20/month includes $22 of credits and the Tool 
 
 ## 6. Decisions still open
 
-- Main model: DeepSeek V4.1 Flash or Claude Haiku 5.5 (decided by the Phase 3 benchmark).
+- ~~Main model: DeepSeek V4.1 Flash or Claude Haiku 5.5.~~ **Decided 18 Nov 2026:** Haiku 5.5 is main; DeepSeek V4.1 Flash 1017 via `/model fast` for research, plus the cheap slots and delegation (see docs/benchmark.md).
 - WhatsApp number: which prepaid SIM.
 - Whether to add a mid tier (GPT-6.1 Terra) or go straight from cheap to Sonnet.
 

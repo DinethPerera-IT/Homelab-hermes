@@ -7,6 +7,9 @@ services:
     env_file: .env
     environment:
       - TZ=Pacific/Auckland
+      - HERMES_DASHBOARD=1
+    ports:
+      - "127.0.0.1:9119:9119"   # dashboard, host localhost only (use an SSH tunnel)
     volumes:
       - ./data:/opt/data
       - ./vault:/vault
@@ -17,7 +20,7 @@ services:
       - no-new-privileges:true
     networks:
       - hermes_net
-    # No ports, no docker.sock, no privileged, no network_mode: host.
+    # Only the dashboard port, bound to 127.0.0.1. No docker.sock, no privileged, no network_mode: host.
     # No healthcheck: the docs don't define one.
 
 networks:
