@@ -47,24 +47,26 @@ docker exec -it -u hermes hermes ... # run hermes CLI as the right user (not roo
 
 ## What went wrong
 
-1. **The default model was Claude Opus 4.6.** With no model chosen, Hermes defaulted to
-   `anthropic/claude-opus-4.6`, one of the most expensive models on OpenRouter. Every test message would
-   have been charged at top-tier prices. Lesson: always check which model is active (`/model` or the config)
-   before chatting. Picking cheap models deliberately is Phase 3, and the OpenRouter US$15 credit limit is
+1. **The image's default model was Claude Opus 4.6, with reasoning effort set to high.** The official image
+   ships with `anthropic/claude-opus-4.6` as the default model, one of the most expensive on OpenRouter, and
+   defaults reasoning effort to `high`, which spends even more tokens per answer. I found it by running
+   `hermes model` and switched to `anthropic/claude-haiku-5.5` **before sending any messages**, so nothing
+   was charged at Opus prices. Lesson: check the active model and reasoning effort right after install,
+   before the first message. Choosing models properly is Phase 3, and the OpenRouter US$15 credit limit is
    the backstop.
-2. **The pasted API key was 171 characters long.** A key pasted into `.env` came out much longer than a real
-   key, so extra text was pasted with it (for example a duplicate paste or stray characters), and
-   authentication failed. Lesson: check the *length* of a secret without printing it, e.g.
-   `awk -F= '/^OPENROUTER_API_KEY=/{print length($2)}' .env`, and compare it with the expected length.
-3. **`docker compose restart` doesn't reload `.env`.** `restart` only stops and starts the *existing*
-   container, which keeps the environment it was created with. After editing `.env` the old key was still in
-   use. Fix: `docker compose up -d` (or `up -d --force-recreate`) recreates the container so it reads the new
-   `.env`.
+2. **The pasted API key was 171 characters long.** I pasted the OpenRouter key through `set-secret.sh`,
+   which hides input, so I couldn't see that extra text went in with it (probably pasted twice). OpenRouter
+   answered with **401 "User not found"**. Fix: re-pasted the key once, then checked its *length* without
+   printing it (73 characters, which is correct) and confirmed that OpenRouter's `/api/v1/key` endpoint
+   accepted it. Lesson: hidden input hides mistakes too, so check a secret's length after setting it, e.g.
+   `awk -F= '/^OPENROUTER_API_KEY=/{print length($2)}' .env`.
+3. **`docker compose restart` doesn't reload `.env`.** After fixing `.env`, the bot *still* got 401.
+   `restart` only stops and starts the *existing* container, which keeps the environment it was created
+   with, so it was still using the broken key. Fix: `docker compose up -d --force-recreate` built a new
+   container that read the corrected `.env`. Lesson: always recreate the container after changing `.env`.
 4. **Minor log warnings, not errors:** `install out of sync (pnpm...)` comes from the image's packaging,
    `Opus codec not found` means only Discord *voice* is disabled (not used), and a notice that
    `OPENROUTER_API_KEY` was loaded and "enables OpenRouter spend" (expected).
-5. **Setup wasn't run before the first start.** The gateway still started and picked keys up from `.env`,
-   but without a chosen model. That's how the Opus default (item 1) appeared.
 
 ## How I tested it
 
