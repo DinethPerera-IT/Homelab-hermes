@@ -1,0 +1,25 @@
+services:
+  hermes:
+    image: nousresearch/hermes-agent:latest   # pin to an X.Y.Z tag once Phase 1 passes
+    container_name: hermes
+    command: gateway run
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=Pacific/Auckland
+    volumes:
+      - ./data:/opt/data
+      - ./vault:/vault
+    mem_limit: 3g
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - hermes_net
+    # No ports, no docker.sock, no privileged, no network_mode: host.
+    # No healthcheck: the docs don't define one.
+
+networks:
+  hermes_net:
+    driver: bridge
