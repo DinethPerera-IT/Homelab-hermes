@@ -2,7 +2,7 @@
 
 **Date:** 18 November 2026
 **Result:** Delegation works and is capped. A 3-child fan-out found far more (and better) sources than a single agent,
-at roughly 16× the cost. The `research-fanout` skill is approved; the next fan-out should use it end to end.
+at about 5× the cost. The `research-fanout` skill is approved; the next fan-out should use it end to end.
 
 ## What is it
 
@@ -95,12 +95,13 @@ Same topic (securing a self-hosted Discord bot in Docker), DeepSeek coordinator 
 | API calls | 8 | 96 (coordinator 15, children 30 / 22 / 29) |
 | Input tokens (cached) | 186K (157K) | 4.38M (4.01M) |
 | Output tokens | 4.6K | 53K |
-| **Cost (estimate)** | **~$0.005** | **~$0.08** (+ ~$0.007 for the Haiku background review after it) |
+| **Cost (OpenRouter)** | **~$0.01–0.02** | **~$0.08** (~5×) |
 | Saved to | `notes/Research/Securing a Self-Hosted Discord Bot in Docker.md` | cache/scratch (skill not yet approved) |
 
-Costs are estimates: logged tokens × list prices (DeepSeek $0.036/M input, $0.01/M cached, $0.50/M output). OpenRouter
-Activity has the exact figures. **Takeaway:** the fan-out is ~16× the cost and ~4× the time for ~10× the sources and much
-better grounding. Worth it for real deep dives, not for quick questions (which is what the skill's "When to use" says).
+Costs are from OpenRouter. All Phase 5 testing came to about **$0.12**; the whole day (Phases 1–5) was **$0.22** for
+**251 requests**, with an **88.8% prompt-cache hit rate**. (An estimate from logged tokens × list prices put the single
+run at ~$0.005; the real figure is higher, so list-price maths undercounts and OpenRouter Activity is the source of
+truth.) **Takeaway:** the fan-out is ~5× the cost and ~4× the time for ~10× the sources and much better grounding. Worth it for real deep dives, not for quick questions (which is what the skill's "When to use" says).
 
 Other checks:
 
