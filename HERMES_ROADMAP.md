@@ -298,17 +298,31 @@ How it works: the main agent calls `delegate_task`. Each sub-agent starts with a
 
 #### Patterns to build, in order
 
-| Pattern | How it splits | Toolsets per sub-agent |
+| Pattern | How it splits | Tools to use (guidance only: children inherit the parent's tools) |
 |---|---|---|
 | Research fan-out | 3 sub-agents each research one angle or source set; the coordinator (Sonnet) merges and writes the note in notes/ | web only |
-| Homelab parallel check | Containers · DNS/Pi-hole · Cloudflare tunnel, merged into one answer | Prometheus MCP only |
+| Homelab parallel check | Containers · DNS/Pi-hole · Cloudflare tunnel, merged into one answer | Prometheus MCP only (**blocked until Phase 7**) |
 | Study pack | One explains the concept, one finds examples, one writes quiz questions | web + notes read |
-| Repo review | One reads code, one reads issues and commits, one checks docs | GitHub MCP only |
+| Repo review | One reads code, one reads issues and commits, one checks docs | GitHub MCP only (**blocked: GitHub MCP skipped**) |
 
 - Keep `delegation.model` on the cheap model. Only the coordinator escalates.
 - Give each pattern a skill that describes which tools to use. A skill is guidance, not enforcement: children still inherit the parent's toolsets (see the correction above).
 - Cap `max_iterations` (set to 30; default 250) so a confused sub-agent cannot loop and burn tokens.
-- No sub-agent gets write access to anything except the notes folder.
+- ~~No sub-agent gets write access to anything except the notes folder.~~ Not enforceable: children get the parent's file
+  and terminal tools. File writes to `config.yaml`, `.env`, `state.db` and `sessions/` are denied by Hermes, `SOUL.md`
+  needs approval, but `skills/*/SKILL.md` and `cron/jobs.json` are writable without a prompt. Mitigation: the SOUL rule
+  "change skills only with skill_manage" and the nightly host-only history in `~/hermes/agent-history`.
+
+**Built (18 Nov 2026):**
+- Discord toolsets cut from 19 to 13 (off: browser, computer_use, image_gen, tts, discord_admin, connections). The
+  parent's tools are the ceiling for every child.
+- `delegation`: DeepSeek V4.1 Flash 1017, 3 children, 30 iterations, `child_timeout_seconds: 300`,
+  `orchestrator_enabled: false`, `inherit_mcp_toolsets: false`, `subagent_auto_approve: false`.
+- `research-fanout` skill (created through `skill_manage`, approved in `/skills pending`).
+- Coordinator for #research: DeepSeek (`/model fast`).
+- Cost line: a host script (`scripts/spend-report.sh`) posts daily OpenRouter spend and per-model call counts to
+  #agent-log at 21:30 NZ, with a $0.50/day alert. Hermes can't post costs itself: children can't use `send_message`, and
+  the agent doesn't see OpenRouter prices.
 
 **Test:** run the research fan-out on one topic, single-agent vs three sub-agents. Compare cost, time and the quality of the final note.
 
