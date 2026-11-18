@@ -26,9 +26,9 @@ Behind both channels sits one agent with one memory. It picks the right model fo
   Hermes gateway  — Docker on the OptiPlex, non-root, 1.5 GB RAM cap
    ├── Models via OpenRouter
    │     main: cheap model · escalate: Claude Sonnet · sub-agents: cheap flash model
-   ├── Memory: core files + session search + git-backed markdown vault
+   ├── Memory: core files + session search + git-backed markdown notes folder
    ├── Tools: web search (free tiers), read-only MCPs
-   │     Prometheus · GitHub (read-only) · vault folder only
+   │     Prometheus · GitHub (read-only) · notes folder only
    ├── Sub-agents: up to 3 in parallel (set; default 10), cheap model, inherit parent's tools
    └── Cron: daily brief, reminders, weekly reports → Discord / WhatsApp
 ```
@@ -74,10 +74,10 @@ This is what "use the appropriate model and tool for the job" looks like in prac
 | You ask in Discord… | Model tier | Tools it should use | Where the answer goes |
 |---|---|---|---|
 | "Is anything down?" / "How full is the disk?" | Cheap | Prometheus MCP | Discord reply |
-| "Which container restarted most this week?" | Cheap → Smart if unclear | Prometheus MCP | Discord reply, saved to vault |
-| "Research X and compare options" | Smart (coordinator) + cheap sub-agents | Web search/extract, vault write | Discord thread + vault note |
-| "Explain this concept for my course" | Cheap; Smart for deep dives | Web search, vault read | Discord |
-| "Review my repo / summarise this week" | Cheap | GitHub MCP (read-only) | Discord + vault |
+| "Which container restarted most this week?" | Cheap → Smart if unclear | Prometheus MCP | Discord reply, saved to notes |
+| "Research X and compare options" | Smart (coordinator) + cheap sub-agents | Web search/extract, notes write | Discord thread + note in notes/ |
+| "Explain this concept for my course" | Cheap; Smart for deep dives | Web search, notes read | Discord |
+| "Review my repo / summarise this week" | Cheap | GitHub MCP (read-only) | Discord + notes |
 | "Remind me Friday 5pm to …" | Cheap | Cron | WhatsApp at that time |
 | Scheduled brief / alert | Cheap (pinned) | Prometheus, Kuma | Discord (full) + WhatsApp (1–3 lines) |
 
@@ -121,13 +121,13 @@ Directory layout on the OptiPlex:
 ├── docker-compose.yml
 ├── .env                 # secrets, git-ignored
 ├── data/                # mounted to /opt/data (memory, sessions, cron, skills)
-└── vault/               # markdown knowledge base (Phase 4), its own git repo
+└── notes/               # markdown knowledge base (Phase 4), its own git repo; NOT "vault" (see Phase 4)
 ```
 
 Compose file (heredoc, paste as one block):
 
 ```bash
-mkdir -p ~/hermes/data ~/hermes/vault && cd ~/hermes
+mkdir -p ~/hermes/data ~/hermes/notes && cd ~/hermes
 cat > docker-compose.yml << 'EOF'
 services:
   hermes:
@@ -138,7 +138,7 @@ services:
     env_file: .env
     volumes:
       - ./data:/opt/data
-      - ./vault:/vault
+      - ./notes:/opt/data/notes   # Phase 4: inside /opt/data, not named vault
     mem_limit: 1.5g
     cpus: 1.0
     security_opt:
@@ -155,7 +155,7 @@ EOF
 
 - No `--privileged`, no host network, no raw Docker socket. If Docker info is needed later, add a GET-only docker-socket-proxy.
 - Nothing from `~/.ssh` or other projects' `.env` files and data folders is mounted.
-- Nightly backup of `~/hermes/data` and `~/hermes/vault` (tar to your backup location).
+- Nightly backup of `~/hermes/data` and `~/hermes/notes` (tar to your backup location).
 - Homepage tile and an Uptime Kuma monitor for the container.
 
 **Test:** ask it to read `/etc/shadow`, run `sudo`, or `docker restart grafana`. All must fail.
@@ -261,12 +261,12 @@ Then enable automatic tiering (later, after the benchmark; review the plugin's c
 | 1. Core files | `memory.md`, `user.md`, `soul.md`, always loaded | Short: hostnames, services, rules, your preferences. Under about 1 page each. No secrets. |
 | 2. Session search | Searches past conversations (SQLite) | On by default. Use it for "what did we try last time?" |
 | 3. External memory (Honcho) | Third-party service that learns patterns | **Skip.** Sends homelab details off the server. |
-| 4. Knowledge vault | Markdown notes, read and written by Hermes and you | `~/hermes/vault`, its own git repo, connected through a filesystem MCP scoped to that folder only |
+| 4. Notes folder | Markdown notes, read and written by Hermes and you | `~/hermes/notes` mounted at `/opt/data/notes`, its own git repo, used with Hermes's built-in file tools (no filesystem MCP) |
 
-#### Vault layout
+#### Notes layout
 
 ```
-vault/
+notes/
 ├── Homelab/        Hosts.md · Services.md · Network.md · Decisions.md
 ├── Runbooks/       one file per procedure
 ├── Incidents/      YYYY-MM-DD-service.md
@@ -278,13 +278,13 @@ vault/
 #### Steps
 
 - Write the three core files by hand first. Ask Hermes to keep them short and review them weekly.
-- Add the filesystem MCP pointed **only** at `/vault`, allow only read, write, list and search tools.
+- ~~Add the filesystem MCP pointed only at `/vault`.~~ **Built (18 Nov 2026):** `./notes` mounted at `/opt/data/notes` (inside `HERMES_WRITE_SAFE_ROOT`) so the built-in file tools work; ACLs give UID 10000 read/write except `.git`. Never name it `vault`: Hermes reserves `$HERMES_HOME/vault` for its encrypted credential store and blocks reads there.
 - Add the GitHub MCP with a fine-grained, **read-only** token scoped to your homelab repos.
 - Write a `research-note` skill: every research job saves a dated note with sources to `Research/`.
-- Commit the vault nightly (cron or a git hook) so every change Hermes makes is reviewable.
+- Commit the notes nightly from the host (`scripts/notes-commit.sh`, crontab 23:45) so every change Hermes makes is reviewable.
 - Review any skill Hermes creates itself before keeping it. Skills live in git; read the diff.
 
-**Test:** in a fresh session, ask "what did we decide about the WhatsApp number?" (session search) and "show my runbook for Pi-hole" (vault). Both answers must be correct.
+**Test:** in a fresh session, ask "what did we decide about the WhatsApp number?" (session search) and "show my runbook for Pi-hole" (notes). Both answers must be correct.
 
 **Done when:** Hermes finds past decisions and notes without the core files growing past a page.
 
@@ -300,19 +300,19 @@ How it works: the main agent calls `delegate_task`. Each sub-agent starts with a
 
 | Pattern | How it splits | Toolsets per sub-agent |
 |---|---|---|
-| Research fan-out | 3 sub-agents each research one angle or source set; the coordinator (Sonnet) merges and writes the vault note | web only |
+| Research fan-out | 3 sub-agents each research one angle or source set; the coordinator (Sonnet) merges and writes the note in notes/ | web only |
 | Homelab parallel check | Containers · DNS/Pi-hole · Cloudflare tunnel, merged into one answer | Prometheus MCP only |
-| Study pack | One explains the concept, one finds examples, one writes quiz questions | web + vault read |
+| Study pack | One explains the concept, one finds examples, one writes quiz questions | web + notes read |
 | Repo review | One reads code, one reads issues and commits, one checks docs | GitHub MCP only |
 
 - Keep `delegation.model` on the cheap model. Only the coordinator escalates.
 - Give each pattern a skill that describes which tools to use. A skill is guidance, not enforcement: children still inherit the parent's toolsets (see the correction above).
 - Cap `max_iterations` (set to 30; default 250) so a confused sub-agent cannot loop and burn tokens.
-- No sub-agent gets write access to anything except the vault.
+- No sub-agent gets write access to anything except the notes folder.
 
 **Test:** run the research fan-out on one topic, single-agent vs three sub-agents. Compare cost, time and the quality of the final note.
 
-**Done when:** a research job in #research produces one merged, sourced vault note and a clear cost line in #agent-log.
+**Done when:** a research job in #research produces one merged, sourced note in notes/ and a clear cost line in #agent-log.
 
 ### Phase 6 — WhatsApp notifications
 
@@ -372,7 +372,7 @@ docker compose restart hermes
 | Nightly self-check (API, model reachable, all jobs ran) | 23:00 daily | Cheap | WhatsApp only if something failed |
 | Backup verification (checks, never runs backups) | 02:30 daily | Cheap | WhatsApp only on failure |
 | Weekly update audit (outdated images, apt) | Sun 10:00 | Cheap | Discord |
-| Weekly lab journal (GitHub commits → draft write-up) | Fri 17:00 | Cheap | Discord + vault |
+| Weekly lab journal (GitHub commits → draft write-up) | Fri 17:00 | Cheap | Discord + notes |
 | Your reminders | Whenever you set them | Cheap | WhatsApp |
 
 **Know this:** cron jobs only fire while the gateway is running, and they deny dangerous shell commands by default because nobody is there to approve them. Uptime Kuma watching the container covers the first point.

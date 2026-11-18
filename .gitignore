@@ -1,6 +1,6 @@
 .env
 data/
-vault/
+notes/
 backups/
 *.zip
 *.docx

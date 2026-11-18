@@ -12,7 +12,7 @@ services:
       - "127.0.0.1:9119:9119"   # dashboard, host localhost only (use an SSH tunnel)
     volumes:
       - ./data:/opt/data
-      - ./vault:/vault
+      - ./notes:/opt/data/notes   # inside HERMES_WRITE_SAFE_ROOT; NOT "vault" (Hermes credential store)
     mem_limit: 3g
     cpus: 1.0
     pids_limit: 256
