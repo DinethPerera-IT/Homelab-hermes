@@ -1,8 +1,9 @@
 # Phase 5: Sub-agents
 
 **Date:** 18 November 2026
-**Result:** Delegation works and is capped. A 3-child fan-out found far more (and better) sources than a single agent,
-at about 5× the cost. The `research-fanout` skill is approved; the next fan-out should use it end to end.
+**Result:** Passed. Delegation works and is capped. A 3-child fan-out found far more (and better) sources than a single
+agent, at about 5× the cost. With the approved `research-fanout` skill, a fan-out in #research wrote one merged, sourced
+note to `notes/Research/` in about 2 minutes. Approvals run in smart mode with Haiku as the reviewer.
 
 ## What is it
 
@@ -48,6 +49,13 @@ the bulk reading is cheap.
   - **`~/hermes/agent-history/`**, a host-only git repo (not mounted into the container). The nightly 23:45 job
     snapshots `MEMORY.md`, `USER.md`, `SOUL.md`, `skills/` and `cron/jobs.json` into it, so any change, gated or not,
     shows up in `git log -p`. A length-aware secret filter skips files that look like they contain real keys.
+- **Approvals: smart mode, Haiku reviewer.** `approvals.mode: smart` sends every command that would normally ask me to
+  the approval model (`auxiliary.approval` = `anthropic/claude-haiku-5.5` via OpenRouter). It answers with one word:
+  **APPROVE** (low risk, runs without asking), **DENY** (blocked) or **ESCALATE** (uncertain, so I get the Discord
+  card). The command is treated as untrusted: comments are stripped and the reviewer is told to ignore instructions
+  inside it, so a prompt-injected command can't talk its way to APPROVE. The built-in blocklist of catastrophic commands
+  still applies, and cron and unattended runs stay on `deny`. Approval storage: **Always** goes to `command_allowlist` in
+  `config.yaml` (kept empty), **Session** lives in memory until a restart, **Once** stores nothing.
 - **Spend reporting** (host, `scripts/spend-report.sh`):
   - Daily at 21:30 NZ it posts to #agent-log: today's spend, month to date, budget left, and Hermes API calls per model.
   - Hourly it records an NZ-midnight baseline (OpenRouter's "daily" is a UTC day) and alerts once a day over $0.50.
@@ -66,10 +74,13 @@ the bulk reading is cheap.
 3. **The fan-out test ran without the skill.** It fell back to `grounded-citations`, and the merged result was saved to
    cache/scratch instead of `notes/Research/`. The only note in `notes/Research/` is from the single-agent run. Lesson:
    check `/skills pending` is empty before a test that depends on a new skill.
-4. **I accidentally gave `execute_code` a permanent approval.** Choosing "always" on a Discord approval card at 21:33
-   added `execute_code` to `command_allowlist`. Removed by editing `config.yaml` (`command_allowlist: []`); Hermes
-   re-reads the list on every check, so no restart was needed. `approvals.mode` is `smart`. Lesson: on approval cards,
-   use "once" unless I really mean forever.
+4. **I gave `execute_code` a permanent approval, twice.** Choosing "Approved permanently" on Discord approval cards
+   at **21:33:31** and **21:49:49** added `execute_code` to `command_allowlist` in `config.yaml`. The first was removed,
+   but the second click (during the fan-out re-run) **added it back**. Fix: `command_allowlist: []` again, `mode: smart`
+   written explicitly, Haiku confirmed as the approval model, and a recreate to clear any in-memory session approvals.
+   The live approval code reads an empty list. Hermes's own automatic config snapshots in `data/backups/config/` (21:17
+   to 21:49) still contain the old entry: harmless unless one is restored. Lesson: choose **Once**. With smart mode, the
+   only cards I see are the ones Haiku is unsure about, which deserve a fresh look each time.
 5. **The curator's patches now wait for approval (the gate works).** The background review staged 3 patches to
    `grounded-citations` (`1083a13f`): reject bot-challenge pages before citing, register sources right after each
    fetch, handle the same docs under two hostnames. I approved them after reading the full diff.
@@ -80,7 +91,10 @@ the bulk reading is cheap.
    placeholder. Checked its shape and length without printing it. Fixed by setting the real URL.
 8. **One child used all 30 iterations** (30 API calls). The cap did its job. If research children keep hitting it,
    tighten the skill's "~10 tool calls" guidance before raising the cap.
-9. **The roadmap's patterns assumed per-child toolsets and MCP servers that don't exist yet.** Homelab check needs the
+9. **A child ignored "web tools only".** In the skill-based re-run, one child ran `execute_code` 6 times (the 21:49
+   approval card was for it). That shows the skill's tool rules are guidance, not enforcement: children inherit the
+   parent's tools, and smart approval is the real safeguard.
+10. **The roadmap's patterns assumed per-child toolsets and MCP servers that don't exist yet.** Homelab check needs the
    Prometheus MCP (Phase 7), and Repo review needs the GitHub MCP (skipped).
 
 ## How I tested it
@@ -115,5 +129,27 @@ Other checks:
 | Permanent approval removed | ✅ `command_allowlist: []`; Hermes's approval module reads an empty list |
 | Spend report | ✅ Posted to #agent-log after the webhook was set; hourly check reports today's spend |
 
-**Still to do:** re-run a fan-out with the approved `research-fanout` skill and confirm it writes
-`notes/Research/YYYY-MM-DD-<slug>.md` with merged sources and a token summary (the roadmap's "Done when").
+### Re-run with the approved `research-fanout` skill (the roadmap's "Done when")
+
+Same topic, DeepSeek coordinator (`/model fast`), 21:48–21:50:
+
+| Check | Result |
+|---|---|
+| Skill used | ✅ `skill_view` loaded `research-fanout`, then one `delegate_task` batch of 3 children |
+| Children | 3 DeepSeek children, 6 / 7 / 7 API calls (well under the 30 cap) |
+| Time | ~2 min (21:48:47–21:50:37) |
+| Tokens | Coordinator 94K in / 5.3K out; children 475K in / 9.7K out (26 API calls total) |
+| Note | ✅ `notes/Research/2026-11-18-secure-discord-bot-docker.md`, with every template section (Summary, Findings, Disagreements and gaps, Sources, Run cost) and **23 sources** |
+| Token summary | ✅ The skill's fallback line: "Token counts not visible to the agent; see the daily spend report in #agent-log." |
+| Cost line in #agent-log | ✅ Via the host spend report (daily 21:30, $0.50/day alert) |
+
+With the skill, the fan-out was much leaner than the first, skill-less one (26 API calls instead of 96, ~2 minutes
+instead of ~4–5), because each child got a focused angle, a fixed output format and a ~10-call budget.
+
+### Approvals after the fix
+
+| Check | Result |
+|---|---|
+| `command_allowlist` | `[]` in `config.yaml`, and `[]` as read by the live approval code after the recreate |
+| `approvals.mode` | `smart` (timeout 300 s; cron and unattended runs: `deny`) |
+| Approval model | `openrouter` / `anthropic/claude-haiku-5.5` |

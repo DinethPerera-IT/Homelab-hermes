@@ -328,6 +328,8 @@ How it works: the main agent calls `delegate_task`. Each sub-agent starts with a
 
 **Done when:** a research job in #research produces one merged, sourced note in notes/ and a clear cost line in #agent-log.
 
+✅ **Done 18 Nov 2026:** `notes/Research/2026-11-18-secure-discord-bot-docker.md` (skill-based fan-out, 23 sources); cost line from the host spend report. Details in docs/phase-5.md.
+
 ### Phase 6 — WhatsApp notifications
 
 **Goal:** reminders, alerts and short updates land on your phone as readable notifications.
