@@ -6,3 +6,4 @@ backups/
 *.docx
 *.bak-*
 agent-history/
+CLAUDE.md
