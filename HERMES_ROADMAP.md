@@ -375,7 +375,7 @@ docker compose restart hermes
 ### Phase 7 — Homelab tools and scheduled jobs
 
 ✅ **Built 19 Nov 2026 (see docs/phase-7.md):** own read-only MCP server
-[`homelab-mcp`](https://github.com/DinethPerera-IT/homelab-mcp) (private repo; six fixed-PromQL tools; hardened
+[`homelab-mcp`](https://github.com/DinethPerera-IT/homelab-mcp) (separate repo; six fixed-PromQL tools; hardened
 container) instead of a generic Prometheus MCP; nftables isolation (Hermes can't reach host services); host textfile
 metrics for containers, apt, reboot and backup age; nightly `data/` backup.
 - **Scheduled:** daily **AI digest** (07:30, DeepSeek, `#ai-digest`) and weekly capacity report (Sun 10:00, Haiku,

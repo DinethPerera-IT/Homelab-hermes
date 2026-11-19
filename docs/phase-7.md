@@ -14,7 +14,7 @@ research, Sonnet for hard problems), without changing any other channel.
 - **homelab-mcp** is my own MCP server (Python, official MCP SDK 2.3.0, streamable HTTP) in its own container. It has
   **six read-only tools** that run **fixed PromQL** against Prometheus. No tool accepts raw PromQL, so the agent can
   only ask the questions I designed. "Code collects the facts; the AI only explains them."
-- Code: separate private repo [`DinethPerera-IT/homelab-mcp`](https://github.com/DinethPerera-IT/homelab-mcp)
+- Code: separate repo [`DinethPerera-IT/homelab-mcp`](https://github.com/DinethPerera-IT/homelab-mcp)
   (`~/homelab-mcp`), with its own README, tests and host scripts.
 
 ## How does it work

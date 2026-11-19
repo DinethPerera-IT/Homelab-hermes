@@ -13,7 +13,7 @@ Built and documented one phase at a time (18–19 November 2026). Each phase has
   *gateway*: one long-running process that connects chat platforms to language models, plus tools (web search, files,
   memory, scheduled jobs, sub-agents).
 - The models run in the cloud through **OpenRouter** (one key, one bill); the server only runs the agent logic.
-- **[homelab-mcp](https://github.com/DinethPerera-IT/homelab-mcp)** (private) is my own read-only MCP server that gives
+- **[homelab-mcp](https://github.com/DinethPerera-IT/homelab-mcp)** (separate repo) is my own read-only MCP server that gives
   Hermes six fixed questions it can ask Prometheus: the AI explains the numbers, code collects them.
 
 ## How does it work
