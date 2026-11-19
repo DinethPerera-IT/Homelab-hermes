@@ -85,16 +85,16 @@ This is what "use the appropriate model and tool for the job" looks like in prac
 
 Eight phases. Each one is built, tested and written up (What is X / How does it work / What went wrong / How I tested it) before the next starts. Rough timing assumes evenings and weekends.
 
-| Phase | What | Effort |
-|---|---|---|
-| 0 | Prep: accounts, keys, spending caps, decisions | 1 evening |
-| 1 | Sandboxed install in Docker | 1–2 evenings |
-| 2 | Discord command centre | 1 evening |
-| 3 | Models and routing | 1 week (includes testing) |
-| 4 | Memory and knowledge | 1 week |
-| 5 | Sub-agents | 2–3 evenings |
-| 6 | WhatsApp notifications | 1–2 evenings |
-| 7 | Homelab tools and scheduled jobs | 1–2 weeks |
+| Phase | What | Effort | Status (19 Nov 2026) |
+|---|---|---|---|
+| 0 | Prep: accounts, keys, spending caps, decisions | 1 evening | ✅ Done |
+| 1 | Sandboxed install in Docker | 1–2 evenings | ✅ Done ([docs/phase-1.md](docs/phase-1.md)) |
+| 2 | Discord command centre | 1 evening | ✅ Done ([docs/phase-2.md](docs/phase-2.md)) |
+| 3 | Models and routing | 1 week (includes testing) | ✅ Done ([docs/phase-3.md](docs/phase-3.md)) |
+| 4 | Memory and knowledge | 1 week | ✅ Done ([docs/phase-4.md](docs/phase-4.md)) |
+| 5 | Sub-agents | 2–3 evenings | ✅ Done ([docs/phase-5.md](docs/phase-5.md)) |
+| 6 | WhatsApp notifications | 1–2 evenings | ⏸ Parked ([docs/todo-whatsapp.md](docs/todo-whatsapp.md)) |
+| 7 | Homelab tools and scheduled jobs | 1–2 weeks | ✅ Built, in its test week ([docs/phase-7.md](docs/phase-7.md)) |
 
 ### Phase 0 — Prep
 
@@ -103,6 +103,7 @@ Eight phases. Each one is built, tested and written up (What is X / How does it 
 - Read the official docs: Installation (Docker), Security, Discord, WhatsApp, MCP, Delegation, Configuring Models.
 - Read `install.sh` / the Docker guide before running anything.
 - Create an OpenRouter account. Set a **US$15/month credit limit** and create a key just for Hermes.
+  **Actual:** the Hermes key is capped at **US$10**; Sonnet in `#auto` has its own key capped at US$1/day.
 - Get free web-search keys: Tavily (1,000/month) and Brave Search (2,000/month). Optional: Exa (1,000/month) for research.
 - Create a **new Discord application** (not the shift-tracker bot). Enable Message Content and Server Members intents. Invite it to a private server.
 - Decide the WhatsApp number (see Phase 6). Recommended: a cheap prepaid SIM, not your main number.
@@ -373,11 +374,16 @@ docker compose restart hermes
 
 ### Phase 7 — Homelab tools and scheduled jobs
 
-✅ **Built 19 Nov 2026 (see docs/phase-7.md):** own read-only MCP server `homelab-mcp` (separate repo; six fixed-PromQL
-tools; hardened container) instead of a generic Prometheus MCP; nftables isolation (Hermes can't reach host services);
-host textfile metrics for containers, apt, reboot and backup age; nightly `data/` backup; daily brief (08:00) and
-weekly capacity report (Sun 10:00) pinned to Haiku, delivered to `#homelab`. Open: Uptime Kuma scrape (needs an API
-key), pin Prometheus.
+✅ **Built 19 Nov 2026 (see docs/phase-7.md):** own read-only MCP server
+[`homelab-mcp`](https://github.com/DinethPerera-IT/homelab-mcp) (private repo; six fixed-PromQL tools; hardened
+container) instead of a generic Prometheus MCP; nftables isolation (Hermes can't reach host services); host textfile
+metrics for containers, apt, reboot and backup age; nightly `data/` backup.
+- **Scheduled:** daily **AI digest** (07:30, DeepSeek, `#ai-digest`) and weekly capacity report (Sun 10:00, Haiku,
+  `#homelab`). The daily homelab brief job was dropped (a "nothing happened" message every morning isn't worth
+  reading); the `homelab-brief` skill stays for on-demand use.
+- **`#auto`:** a second profile routed to one channel: Haiku front desk picks Haiku, a quick lookup, DeepSeek research,
+  Sonnet (own key, US$1/day) or the homelab tools for each message; anything that changes something asks first.
+- **Open:** Uptime Kuma scrape (needs an API key), pin Prometheus, the test week below.
 
 **Goal:** Hermes reports on the homelab using real numbers, on a schedule.
 
@@ -388,20 +394,23 @@ key), pin Prometheus.
 
 #### Scheduled jobs
 
-| Job | When (NZT) | Model | Delivered to |
-|---|---|---|---|
-| Daily homelab brief | 08:00 daily | Cheap | Discord #homelab-brief (full) + WhatsApp (1 line) |
-| Nightly self-check (API, model reachable, all jobs ran) | 23:00 daily | Cheap | WhatsApp only if something failed |
-| Backup verification (checks, never runs backups) | 02:30 daily | Cheap | WhatsApp only on failure |
-| Weekly update audit (outdated images, apt) | Sun 10:00 | Cheap | Discord |
-| Weekly lab journal (GitHub commits → draft write-up) | Fri 17:00 | Cheap | Discord + notes |
-| Your reminders | Whenever you set them | Cheap | WhatsApp |
+| Job | When (NZT) | Model | Delivered to | Status |
+|---|---|---|---|---|
+| Daily homelab brief | 08:00 daily | Cheap | Discord #homelab-brief (full) + WhatsApp (1 line) | ✖ Dropped: replaced by the AI digest; skill kept for on-demand use |
+| Nightly self-check (API, model reachable, all jobs ran) | 23:00 daily | Cheap | WhatsApp only if something failed | ⏸ Later (needs Phase 6); spend alert covers cost |
+| Backup verification (checks, never runs backups) | 02:30 daily | Cheap | WhatsApp only on failure | ⏸ Later; backup age is a metric in `host_summary` |
+| Weekly update audit (outdated images, apt) | Sun 10:00 | Cheap | Discord | ◐ Partly: the weekly capacity report covers apt updates and reboot; outdated images not checked yet |
+| Weekly lab journal (GitHub commits → draft write-up) | Fri 17:00 | Cheap | Discord + notes | ⏸ Later |
+| Your reminders | Whenever you set them | Cheap | WhatsApp | ✅ Via Discord for now (`#auto` creates them without asking) |
+| **Daily AI digest** (added) | 07:30 daily | DeepSeek V4.1 Flash | Discord #ai-digest | ✅ Running |
 
 **Know this:** cron jobs only fire while the gateway is running, and they deny dangerous shell commands by default because nobody is there to approve them. Uptime Kuma watching the container covers the first point.
 
 **Test:** one week of briefs checked against Grafana and Kuma. Note any wrong or invented numbers.
 
 **Done when:** a week of briefs has zero invented numbers and every job ran.
+*Updated 19 Nov 2026:* with the daily brief dropped, the test week is: 7 AI digests (every item has a real, dated source;
+no blocked tool calls) and one weekly capacity report whose numbers match Grafana. Ends 26 Nov 2026.
 
 ## 4. Security checklist
 
@@ -415,6 +424,8 @@ key), pin Prometheus.
 - Keep secrets, IPs and sensitive log lines out of prompts sent to cloud models.
 - Agent-written skills reviewed in git before they are kept.
 - Changes (restart, edit, install, delete) out of scope until a later, written-down decision.
+  **Decided 19 Nov 2026** (docs/phase-7.md, `#auto`): reminders I ask for, facts I ask it to remember and notes in
+  `notes/Research/` and `notes/Briefs/` need no confirmation; everything else that changes something still asks first.
 
 ## 5. Monthly budget
 
@@ -425,7 +436,9 @@ key), pin Prometheus.
 | Escalations to Claude Sonnet 5.5 (a few hard jobs a week) | ~$3–8 |
 | Web search (Tavily, Brave, Exa free tiers) | $0 |
 | Prepaid SIM for WhatsApp | A few NZD a month (check NZ prepaid plans) |
-| **Total** | **~$5–15, capped at $15 on OpenRouter** |
+| **Total** | **~$5–15 planned; capped at US$10 on the Hermes key (+ US$1/day for Sonnet in `#auto`)** |
+
+**Actual so far:** about US$0.33 for the whole build (18–19 Nov 2026).
 
 Alternative: Nous Portal Plus at $20/month includes $22 of credits and the Tool Gateway (Firecrawl search, browser automation, code sandboxes). Worth it only if you start needing browser automation.
 
@@ -433,7 +446,8 @@ Alternative: Nous Portal Plus at $20/month includes $22 of credits and the Tool 
 
 - ~~Main model: DeepSeek V4.1 Flash or Claude Haiku 5.5.~~ **Decided 18 Nov 2026:** Haiku 5.5 is main; DeepSeek V4.1 Flash 1017 via `/model fast` for research, plus the cheap slots and delegation (see docs/benchmark.md).
 - WhatsApp number: which prepaid SIM.
-- Whether to add a mid tier (GPT-6.1 Terra) or go straight from cheap to Sonnet.
+- ~~Whether to add a mid tier (GPT-6.1 Terra) or go straight from cheap to Sonnet.~~ **Decided 19 Nov 2026:** no mid
+  tier. Hard problems go straight to Sonnet 5.5, routed automatically in `#auto` on its own key capped at US$1/day.
 
 ## 7. Sources
 
