@@ -68,7 +68,7 @@ better at digging through sources for a fraction of the price, so it does resear
 - **Sandbox:** Docker, non-root, `no-new-privileges`, memory/CPU/pid limits, no Docker socket, no host network, no
   `--privileged`. Escape tests (read `/etc/shadow`, `sudo`, `~/.ssh`, restart other containers) all failed.
 - **Network:** an nftables table of my own blocks Hermes from every host service and other container (it could reach
-  all of them before Phase 7, including a deliberately vulnerable pentest target). homelab-mcp can reach only Prometheus.
+  all of them before Phase 7, including a deliberately vulnerable practice app on the LAN). homelab-mcp can reach only Prometheus.
 - **Access:** Discord allowlist = my user ID; the bot ignores everyone else. Remote access only via Tailscale.
 - **Approvals:** smart mode: Haiku reviews flagged commands and asks me when unsure; no permanent approvals; cron runs
   deny anything that needs approval. Skills the agent writes wait for my approval (`/skills pending`).
@@ -107,3 +107,7 @@ add-env-id.sh             add a Discord channel ID to a .env list safely
 HERMES_ROADMAP.md         the plan
 ```
 Not in git: `.env`, `data/` (agent state), `notes/` (its own repo), `agent-history/` (its own repo), backups.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

@@ -18,7 +18,7 @@
 | Data | Named volume `uptime-kuma` → `/app/data` (SQLite `kuma.db` ~120 MB + WAL) |
 | Port | `3001` published on **all interfaces** (LAN included) |
 | Restart policy | `always` |
-| Used by | Homepage widget (`http://192.168.1.10:3001`), Caddy `uptime.dinashomelab.internal`, status page `/status/dinashomelab` |
+| Used by | Homepage widget (`http://<lan-ip>:3001`), Caddy `uptime.dinashomelab.internal`, status page `/status/dinashomelab` |
 
 ## v1 → v2 risks
 - **The database is migrated in place.** Heartbeat data is aggregated into a new format. It took ~7 minutes for the
@@ -84,7 +84,7 @@
 ### 6. Afterwards
 - **Tighten port 3001.** It's currently published on every interface, LAN included.
   - Bind it to `127.0.0.1:3001:3001` and reach Kuma only through Caddy (`uptime.dinashomelab.internal`).
-  - Before changing it, update the Homepage widget URL (`http://192.168.1.10:3001`) to a URL Homepage can still reach,
+  - Before changing it, update the Homepage widget URL (`http://<lan-ip>:3001`) to a URL Homepage can still reach,
     and update any other direct users of `:3001`.
   - Check with `ss -tlnp | grep 3001`.
 - After about a week of normal running: `docker rm uptime-kuma-v1` and remove the old image.

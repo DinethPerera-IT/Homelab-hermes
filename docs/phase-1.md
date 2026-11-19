@@ -98,7 +98,7 @@ docker exec -it -u hermes hermes ... # run hermes CLI as the right user (not roo
 |---|---|
 | `sudo` | not available |
 | `cat /etc/shadow` | Permission denied |
-| `/home/dinashomelab` | does not exist in the container |
+| My home folder on the host (`~`) | does not exist in the container |
 | `/var/run/docker.sock` | does not exist |
 
 **Still to do (carried over from the roadmap):** check it survives a reboot (plan around the WiFi driver),

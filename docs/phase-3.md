@@ -85,7 +85,7 @@ so a siteMonitor on `/api/status` wasn't possible without opening a port.
 5. **The kiosk couldn't open the tiles.** The server's own DNS is `1.1.1.1` / `8.8.8.8`. It doesn't use Pi-hole or
    Tailscale MagicDNS, so the kiosk Chromium got `DNS_PROBE_FINISHED_NXDOMAIN` for the Tailscale URL and **every**
    `.dinashomelab.internal` name. Fix: server-only entries in `/etc/hosts` (Tailscale name → `<tailscale-ip>`,
-   `.internal` names → `192.168.1.10`) under the comment "add new .internal services here too". This doesn't touch
+   `.internal` names → `<lan-ip>`) under the comment "add new .internal services here too". This doesn't touch
    netplan, Tailscale or Pi-hole, and keeps working if Pi-hole is down.
 6. **Context growth was the biggest cost driver.** Long sessions re-send the whole history every turn. In the
    benchmark, DeepSeek sessions grew to ~65K input tokens per call, making its run cost ~2× Haiku's even though each

@@ -3,7 +3,7 @@
 **Date:** 19 November 2026
 **Result:** Hermes answers homelab questions with measured numbers from my own read-only MCP server, `homelab-mcp`,
 and posts a daily AI digest and a weekly capacity report to Discord. Along the way: Hermes is now firewalled off from
-every host service (it could reach all of them, including the HR System pentest target), and `data/` is backed up
+every host service (it could reach all of them, including a deliberately vulnerable practice app on the LAN), and `data/` is backed up
 nightly. A new `#auto` channel routes each request to the right model automatically (Haiku front desk, DeepSeek
 research, Sonnet for hard problems), without changing any other channel.
 
@@ -166,11 +166,11 @@ and restore `config.yaml.bak-2026-11-19-auto` + `.env.bak-2026-11-19-auto`; (C) 
 ## What went wrong
 
 1. **Hermes could reach every service on the host.** From inside the container, TCP connects succeeded to Prometheus,
-   node-exporter, Uptime Kuma, Pi-hole, Caddy, Homepage **and the deliberately vulnerable HR System**: they listen on
+   node-exporter, Uptime Kuma, Pi-hole, Caddy, Homepage **and a deliberately vulnerable practice app (LAN only)**: they listen on
    all interfaces, the Docker gateway leads to the host, and the host firewall had no rules (ufw inactive, INPUT
    accept). A gap since Phase 1. Fixed with the nftables isolation above.
 2. **Published ports bypassed the first firewall version.** Blocking `input` stopped host-network services, but Kuma
-   (3001), Homepage (3005) and the HR System (3050) stayed open: Docker DNATs published ports to the target container,
+   (3001), Homepage (3005) and the practice app stayed open: Docker DNATs published ports to the target container,
    so they pass the `forward` hook. Added forward rules. Also caught: Docker passes traffic *inside* a bridge through
    `forward` too (br_netfilter), so my first MCP rule would have broken Hermes ↔ homelab-mcp; the MCP rules only drop
    traffic *leaving* their bridge.
@@ -231,7 +231,7 @@ and restore `config.yaml.bak-2026-11-19-auto` + `.env.bak-2026-11-19-auto`; (C) 
 | Runtime image | ✅ 57 MB, uid 10001, no pytest inside, refuses a placeholder token |
 | Hermes ↔ homelab-mcp | ✅ no token 401; with token 200; `host_summary` returned real values |
 | homelab-mcp → Prometheus | ✅ 200 |
-| homelab-mcp → internet, node-exporter, HR System, Pi-hole | ✅ all blocked |
+| homelab-mcp → internet, node-exporter, practice app, Pi-hole | ✅ all blocked |
 | Hermes → host services (7 ports × 4 host addresses) | ✅ 0 of 28 open; internet (OpenRouter, Discord, Tavily) still 200 |
 | `hermes mcp test homelab` | ✅ connected, 6 tools discovered, Authorization masked |
 | Daily brief run by hand (before the job was dropped) | ✅ all 5 tools called (< 0.1 s each), delivered to `#homelab`; numbers matched the tools |
@@ -249,7 +249,7 @@ and restore `config.yaml.bak-2026-11-19-auto` + `.env.bak-2026-11-19-auto`; (C) 
 ## Found and left for later
 
 - **32 apt upgrades pending, reboot required** (plan around the WiFi driver).
-- **Prometheus**: unpinned `latest` image and listening on the LAN with no login. Pin it and add the Kuma scrape in one
+- **Prometheus**: unpinned `latest` image and not yet locked down. Pin it and add the Kuma scrape in one
   recreate, once a Kuma API key exists.
 - Delete `node-exporter-old` after a week; consider removing the 14 leftover July containers.
 - Backups are on the same disk: they protect against mistakes, not a dead disk.

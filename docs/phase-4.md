@@ -30,7 +30,7 @@ Plus a **skills approval gate**, and a **memory history** in git instead of a me
   - no Docker or host access by design, so give the host command instead
 - `MEMORY.md` (1,536 of 2,200 chars): the agent's 2 entries from Phase 3, plus three of mine:
   - the host and its services
-  - hostnames and the HR System warning
+  - hostnames and the warning about the practice app
   - "time, disk, RAM and service state always come from a command"
   - No IPs, no secrets.
 - `USER.md` (294 of 1,375 chars): name, NZ timezone, homelab and networking student, short answers that explain why,
