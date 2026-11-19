@@ -71,12 +71,24 @@ else
     budget_line="Budget: no spending limit set on this key"
 fi
 
+# Sonnet route (#auto profile): its own OpenRouter key "hermes-auto-sonnet", $1/day cap, resets 00:00 UTC.
+# The key is read through the container (data/ is mode 700) and only ever passed to curl on stdin.
+SKEY=$(docker exec -u hermes hermes sed -nE "s/^OPENROUTER_SONNET_API_KEY=[\"']?([^\"']*)[\"']?$/\\1/p" \
+       /opt/data/profiles/auto/.env 2>/dev/null | tail -n 1 || true)
+if [ -n "$SKEY" ] && SJ=$(api /key "$SKEY"); then
+    s_day=$(printf '%s' "$SJ" | jq -r '.data.usage_daily // 0')
+    s_lim=$(printf '%s' "$SJ" | jq -r '.data.limit // empty')
+    sonnet_line="Sonnet (#auto): **$(money "$s_day" 2)** today (UTC day)${s_lim:+ of $(money "$s_lim" 2)} · resets 13:00 NZDT"
+else
+    sonnet_line="Sonnet (#auto): key not readable or OpenRouter /key failed"
+fi
+SKEY=
 calls=$(docker exec -u hermes hermes sh -c "grep -h '^$today .*API call #' /opt/data/logs/agent.log 2>/dev/null" \
         | sed -nE 's/.* model=([^ ]+) .*/\1/p' | sort | uniq -c | sort -rn || true)
 n_calls=$(printf '%s\n' "$calls" | awk '{ s += $1 } END { print s + 0 }')
 per_model=$(printf '%s\n' "$calls" | awk 'NF { printf "%s%s %s", (n++ ? "  ·  " : ""), $2, $1 }')
 
-msg=$(printf '**Hermes spend · %s (NZ)**\n%s\nMonth to date (UTC month): **%s**\n%s\nHermes API calls today: **%s**%s' \
-    "$(date '+%a %d %b %Y, %H:%M')" "$today_line" "$(money "$utc_month" 2)" "$budget_line" \
+msg=$(printf '**Hermes spend · %s (NZ)**\n%s\nMonth to date (UTC month): **%s**\n%s\n%s\nHermes API calls today: **%s**%s' \
+    "$(date '+%a %d %b %Y, %H:%M')" "$today_line" "$(money "$utc_month" 2)" "$budget_line" "$sonnet_line" \
     "$n_calls" "${per_model:+ — $per_model}")
 post "$msg" && echo "daily report posted" && printf '%s\n' "$msg"
