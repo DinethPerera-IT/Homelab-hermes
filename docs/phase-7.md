@@ -14,7 +14,8 @@ research, Sonnet for hard problems), without changing any other channel.
 - **homelab-mcp** is my own MCP server (Python, official MCP SDK 2.3.0, streamable HTTP) in its own container. It has
   **six read-only tools** that run **fixed PromQL** against Prometheus. No tool accepts raw PromQL, so the agent can
   only ask the questions I designed. "Code collects the facts; the AI only explains them."
-- Code: separate private repo `homelab-mcp` (`~/homelab-mcp`), with its own README, tests and host scripts.
+- Code: separate private repo [`DinethPerera-IT/homelab-mcp`](https://github.com/DinethPerera-IT/homelab-mcp)
+  (`~/homelab-mcp`), with its own README, tests and host scripts.
 
 ## How does it work
 
@@ -196,7 +197,8 @@ and restore `config.yaml.bak-2026-11-19-auto` + `.env.bak-2026-11-19-auto`; (C) 
     containers from July, my `node-exporter-old` rollback copy, and one from today. The script now labels the restart
     policy and the tool only flags containers meant to stay up; the rest are counted as `stopped_on_purpose`.
 12. **`gh` couldn't create the GitHub repo** (`Resource not accessible by personal access token`): the token can't create
-    repositories. The repo is created in the GitHub UI and pushed over SSH.
+    repositories. I created the repo in the GitHub UI (private) and pushed over SSH, after checking that `.env` was
+    never committed and no commit contains anything key-like.
 13. **Accepted:** homelab-mcp can also reach Prometheus through the host's LAN address, because the rule allows port
     9090 on the host whichever address is used. It is still only Prometheus.
 14. **The first AI digest posted meta commentary, not news.** v1 used a strict 48-hour window, found "nothing", and
