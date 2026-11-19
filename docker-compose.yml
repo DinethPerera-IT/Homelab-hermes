@@ -20,9 +20,17 @@ services:
       - no-new-privileges:true
     networks:
       - hermes_net
+      - mcp_internal   # reaches homelab-mcp only (internal network owned by ~/homelab-mcp)
     # Only the dashboard port, bound to 127.0.0.1. No docker.sock, no privileged, no network_mode: host.
     # No healthcheck: the docs don't define one.
 
 networks:
   hermes_net:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-hermes   # fixed name for the host firewall (homelab-mcp/host/homelab-isolation.nft)
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  mcp_internal:
+    external: true   # created by ~/homelab-mcp (docker compose up there first)
